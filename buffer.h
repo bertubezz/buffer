@@ -15,6 +15,8 @@ public:
 	using const_reference = const reference;
 	using iterator = pointer;
 	using const_iterator = const pointer;
+	using reverse_iterator = std::reverse_iterator<iterator>;
+	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 private:
 	pointer _begin, _end, _endOfStorage;
@@ -100,10 +102,16 @@ public:
 	iterator begin() noexcept { return _begin; }
 	const_iterator begin() const noexcept { return _begin; }
 	const_iterator cbegin() const noexcept { return _begin; }
+	reverse_iterator rbegin() noexcept { return reverse_iterator(_end); }
+	const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(_end); }
+	const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(_end); }
 
 	iterator end() noexcept { return _end; }
 	const_iterator end() const noexcept { return _end; }
 	const_iterator cend() const noexcept { return _end; }
+	reverse_iterator rend() noexcept { return reverse_iterator(_begin); }
+	const_reverse_iterator rend() const noexcept { return const_reverse_iterator(_begin); }
+	const_reverse_iterator crend() const noexcept { return const_reverse_iterator(_begin); }
 
 	uint64_t size() const noexcept { return _end - _begin; }
 	uint64_t capacity() const noexcept { return _endOfStorage - _begin; }
@@ -160,6 +168,7 @@ public:
 			memset(_begin + oldSize, 0, newSize - oldSize);
 	}
 
+	// T must implement `.data` and `.size`
 	template<typename T>
 	void assign(const T& other)
 	{
@@ -172,6 +181,7 @@ public:
 		memcpy(_begin, other.data(), other.size());
 	}
 
+	// T must implement `.data` and `.size`
 	template<typename T>
 	void insert(const_iterator position, const T& other)
 	{
@@ -200,6 +210,25 @@ public:
 		memcpy(position, other.data(), otherSize);
 	}
 
+	iterator erase(const_iterator position)
+	{
+		auto begin = const_cast<iterator>(position);
+
+		--_end;
+		memmove(begin, begin + 1, (_end - begin));
+		return begin;
+	}
+
+	iterator erase(const_iterator first, const_iterator last)
+	{
+		auto begin = const_cast<iterator>(first);
+		auto size = last - first;
+
+		_end -= size;
+		memmove(begin, begin + size, (_end - begin));
+		return begin;
+	}
+
 	void swap(Buffer& other)
 	{
 		std::swap(_begin, other._begin);
@@ -210,6 +239,16 @@ public:
 	friend void swap(Buffer& lhs, Buffer& rhs)
 	{
 		lhs.swap(rhs);
+	}
+
+	friend bool operator==(const Buffer& lhs, const Buffer& rhs)
+	{
+		return lhs.size() == rhs.size && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+	}
+
+	friend bool operator !=(const Buffer& lhs, const Buffer& rhs)
+	{
+		return !(lhs == rhs);
 	}
 };
 
