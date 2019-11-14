@@ -9,12 +9,12 @@ class Buffer
 {
 public:
 	using value_type = std::byte;
-	using pointer = value_type *;
-	using const_pointer = const pointer;
-	using reference = value_type &;
-	using const_reference = const reference;
+	using pointer = value_type*;
+	using const_pointer = const value_type*;
+	using reference = value_type&;
+	using const_reference = const value_type&;
 	using iterator = pointer;
-	using const_iterator = const pointer;
+	using const_iterator = const value_type*;
 	using reverse_iterator = std::reverse_iterator<iterator>;
 	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -37,15 +37,19 @@ public:
 	{
 	}
 
-	explicit Buffer(uint64_t size, Options options = Options::Default)
+	Buffer(uint64_t size, Options options = Options::Default)
 		: _begin(new value_type[size]), _end(_begin+size), _endOfStorage(_end)
 	{
 		if (options == Options::Initialize)
 			memset(_begin, 0, size);
 	}
 
-	template<typename T>
-	Buffer(const T& other)
+	explicit Buffer(std::string_view other)
+	{
+		assign(other);
+	}
+
+	Buffer(const Buffer& other)
 	{
 		assign(other);
 	}
@@ -90,6 +94,8 @@ public:
 	pointer data() noexcept { return _begin; }
 	const_pointer data() const noexcept { return _begin; }
 
+	std::string_view toString() const { return std::string_view(std::string_view::const_pointer(_begin), size()); }
+
 	reference operator[](uint64_t index) noexcept { return _begin[index]; }
 	const_reference operator[](uint64_t index) const noexcept { return _begin[index]; }
 
@@ -104,7 +110,7 @@ public:
 	const_iterator cbegin() const noexcept { return _begin; }
 	reverse_iterator rbegin() noexcept { return reverse_iterator(_end); }
 	const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(_end); }
-	const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(_end); }
+    const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(_end); }
 
 	iterator end() noexcept { return _end; }
 	const_iterator end() const noexcept { return _end; }
@@ -172,20 +178,26 @@ public:
 	template<typename T>
 	void assign(const T& other)
 	{
-		if (_begin)
-			delete[] _begin;
-		_begin = new value_type[size];
-		_end = _begin + size;
-		_endOfStorage = _end;
-
-		memcpy(_begin, other.data(), other.size());
+		const auto newSize = other.size();
+		
+        if (newSize > capacity() || !_begin)
+        {
+            if (_begin)
+                delete[] _begin;
+		    
+            _begin = new value_type[newSize];		
+		    _endOfStorage = _begin + newSize;
+        }
+		
+		_end = _begin + newSize;
+		memcpy(_begin, other.data(), newSize);
 	}
 
 	// T must implement `.data` and `.size`
 	template<typename T>
 	void insert(const_iterator position, const T& other)
 	{
-		const auto otherSize = other.size()
+		const auto otherSize = other.size();
 		const auto newSize = size() + otherSize;
 		
 		if (capacity() < newSize)
@@ -194,7 +206,7 @@ public:
 
 			memcpy(newStorage, _begin, position - _begin);
 			memcpy(newStorage + (position - _begin) + otherSize,
-				_begin + position, _end - position);
+				position, _end - position);
 
 			if (_begin)
 				delete[] _begin;
@@ -243,7 +255,7 @@ public:
 
 	friend bool operator==(const Buffer& lhs, const Buffer& rhs)
 	{
-		return lhs.size() == rhs.size && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+		return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
 	}
 
 	friend bool operator !=(const Buffer& lhs, const Buffer& rhs)
